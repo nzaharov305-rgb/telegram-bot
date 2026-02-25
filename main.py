@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    config = Config.from_env()
+    config = Config.load()
     bot = Bot(token=config.TOKEN, parse_mode=ParseMode.HTML)
     dp = Dispatcher()
 
