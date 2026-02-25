@@ -181,17 +181,24 @@ def build_url(mode, rooms, district):
     return f"{base}?das[who]=1&das[live.rooms]={rooms}"
 
 # ================= ПАРСЕР =================
-
 async def parse(url):
     headers = {"User-Agent": "Mozilla/5.0"}
-    async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.get(url, timeout=15) as response:
-            html = await response.text()
+    results = []
+
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url, timeout=15) as response:
+                html = await response.text()
+    except asyncio.TimeoutError:
+        print("Timeout while fetching:", url)
+        return []
+    except Exception as e:
+        print("Parse error:", e)
+        return []
 
     soup = BeautifulSoup(html, "lxml")
     cards = soup.select("div.a-card")
 
-    results = []
     for card in cards:
         title = card.select_one("a.a-card__title")
         price = card.select_one("div.a-card__price")
@@ -203,6 +210,7 @@ async def parse(url):
         results.append((title.text.strip(), price.text.strip(), link))
 
     return results
+
 
 # ================= СТАРТ =================
 
