@@ -2,10 +2,11 @@
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Dict
 
 from aiogram import Bot
 
-from config import Config
+from config import Config, get_redis
 from database import (
     get_pool,
     user_get_active_by_tier,
@@ -15,8 +16,15 @@ from database import (
     stats_increment_messages,
 )
 from parser import KrishaParser, Listing
+from ai_service import analyze_listing
+
+# limit concurrent AI calls
+ai_semaphore = asyncio.Semaphore(3)
 
 logger = logging.getLogger(__name__)
+
+# in-memory cache of pro users -> residential complex
+pro_users_cache: Dict[int, str] = {}
 
 DISTRICT_MAP = {
     "Алмалинский": "almalinskij",
@@ -60,6 +68,8 @@ class SendQueue:
                     await stats_cb(1)
             except Exception as e:
                 logger.warning("Send to %s failed: %s", item.user_id, e)
+            # additional delay to avoid 429 errors
+            await asyncio.sleep(0.3)
             await asyncio.sleep(1.0 / self._rate)
 
     def start(self, stats_cb=None) -> None:
@@ -74,18 +84,62 @@ async def _process_user(
     queue: SendQueue,
     config: Config,
 ) -> None:
+    uid = user.get("user_id")
+    # pro cache filter
+    user_complex = pro_users_cache.get(uid)
+
     for ls in listings:
+        # global redis duplicate cache
+        try:
+            redis = await get_redis()
+            key = f"listing:{ls.id}"
+            if await redis.exists(key):
+                continue
+            await redis.set(key, "sent", ex=3600)
+            logger.info(f"Listing cached: {ls.id}")
+        except Exception as e:
+            logger.warning("Redis cache error: %s", e)
+
         if user.get("from_owner") and not ls.from_owner:
             continue
-        if await sent_was_sent(pool, user["user_id"], ls.id):
+
+        # filter by residential complex for pro users
+        if user_complex:
+            listing_complex = getattr(ls, "residential_complex", None)
+            if listing_complex and listing_complex != user_complex:
+                continue
+
+        if await sent_was_sent(pool, uid, ls.id):
             continue
         if user.get("subscription_type") == "free":
-            if await sent_count_today(pool, user["user_id"]) >= config.FREE_MAX_LISTINGS_PER_DAY:
+            if await sent_count_today(pool, uid) >= config.FREE_MAX_LISTINGS_PER_DAY:
                 continue
         text = f"🏠 {ls.title}\n💰 {ls.price}\n🔗 {ls.url}"
         is_pro = user.get("subscription_type") == "pro"
-        await queue.put(user["user_id"], text, is_pro=is_pro)
-        await sent_mark(pool, user["user_id"], ls.id)
+
+        # AI analysis for PRO users
+        if is_pro:
+            try:
+                async with ai_semaphore:
+                    ai_text = await analyze_listing(
+                        {
+                            "id": ls.id,
+                            "title": ls.title,
+                            "price": ls.price,
+                            "district": user.get("district"),
+                            "residential_complex": getattr(ls, "residential_complex", None),
+                            "description": getattr(ls, "description", ""),
+                        }
+                    )
+                if ai_text:
+                    text += "\n\n🤖 AI Анализ:\n" + ai_text
+            except Exception as e:
+                logger.warning("AI semaphore error: %s", e)
+
+        await queue.put(uid, text, is_pro=is_pro)
+        await sent_mark(pool, uid, ls.id)
+        # small delay between outgoing messages to avoid 429
+        await asyncio.sleep(0.3)
 
 
 async def _tier_loop(
@@ -98,6 +152,7 @@ async def _tier_loop(
     parser = KrishaParser(config)
 
     while True:
+        logger.info("Monitor heartbeat")
         try:
             users = await user_get_active_by_tier(pool, tier)
             for user in users:
@@ -130,11 +185,37 @@ async def _tier_loop(
                 except Exception as e:
                     logger.exception("Monitor user %s: %s", user.get("user_id"), e)
         except Exception as e:
-            logger.exception("Monitor tier %s: %s", tier, e)
+            logger.exception("Monitor loop crashed but recovered")
         await asyncio.sleep(interval)
 
 
+async def refresh_pro_cache() -> None:
+    try:
+        pool = await get_pool()
+        users = await user_get_active_by_tier(pool, "pro")
+        pro_users_cache.clear()
+        for u in users:
+            rc = u.get("residential_complex")
+            if rc:
+                pro_users_cache[u["user_id"]] = rc
+        logger.info("PRO cache refreshed")
+    except Exception as e:
+        logger.exception("Failed to refresh PRO cache: %s", e)
+
+
+async def _pro_cache_refresher() -> None:
+    while True:
+        await refresh_pro_cache()
+        await asyncio.sleep(300)  # 5 minutes
+
+
 async def run_monitor(bot: Bot, config: Config) -> None:
+    # ensure redis connection is ready
+    try:
+        await get_redis()
+    except Exception as e:
+        logger.warning("Redis init failed: %s", e)
+
     pool = await get_pool()
     queue = SendQueue(bot, config.RATE_LIMIT_PER_SECOND)
 
@@ -142,6 +223,10 @@ async def run_monitor(bot: Bot, config: Config) -> None:
         await stats_increment_messages(pool, count)
 
     queue.start(on_sent)
+
+    # initial pro cache and periodic refresh
+    await refresh_pro_cache()
+    asyncio.create_task(_pro_cache_refresher())
 
     await asyncio.gather(
         _tier_loop("pro", config.PRO_CHECK_INTERVAL, config, queue),

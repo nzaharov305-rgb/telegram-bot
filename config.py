@@ -1,10 +1,19 @@
 """Production-ready конфигурация. Railway: TOKEN, DATABASE_URL."""
 import os
+import logging
 from dataclasses import dataclass
+from typing import Optional
 
 from dotenv import load_dotenv
 
+import redis.asyncio as aioredis
+
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# global redis client singleton
+_redis_client: Optional[aioredis.Redis] = None
 
 
 @dataclass(frozen=True)
@@ -12,6 +21,7 @@ class Config:
     TOKEN: str
     DATABASE_URL: str
     ADMIN_IDS: tuple[int, ...]
+    OPENAI_API_KEY: str | None = None
 
     PRICE_STANDARD: int = 4900
     PRICE_PRO: int = 9900
@@ -31,6 +41,7 @@ class Config:
     def from_env(cls) -> "Config":
         token = os.getenv("TOKEN") or os.getenv("BOT_TOKEN")
         db_url = os.getenv("DATABASE_URL")
+        openai_key = os.getenv("OPENAI_API_KEY")
         admin_ids = tuple(
             int(x.strip())
             for x in (os.getenv("ADMIN_IDS", "") or os.getenv("ADMIN_ID", "0")).split(",")
@@ -46,9 +57,27 @@ class Config:
             TOKEN=token,
             DATABASE_URL=db_url,
             ADMIN_IDS=admin_ids or (0,),
+            OPENAI_API_KEY=openai_key,
             PRICE_STANDARD=int(os.getenv("PRICE_STANDARD", "4900")),
             PRICE_PRO=int(os.getenv("PRICE_PRO", "9900")),
             TRIAL_HOURS=int(os.getenv("TRIAL_HOURS", "2")),
             FREE_MAX_LISTINGS_PER_DAY=int(os.getenv("FREE_MAX_LISTINGS_PER_DAY", "5")),
             PROXY_LIST=proxy_list,
         )
+
+
+async def get_redis() -> aioredis.Redis:
+    """Return a singleton Redis client. Retry on ping failures."""
+    global _redis_client
+    if _redis_client is None:
+        url = os.getenv("REDIS_URL")
+        if not url:
+            raise RuntimeError("REDIS_URL is not configured")
+        _redis_client = aioredis.from_url(url, encoding="utf-8", decode_responses=True)
+    try:
+        await _redis_client.ping()
+    except Exception:
+        logger.warning("Redis ping failed, recreating connection")
+        url = os.getenv("REDIS_URL")
+        _redis_client = aioredis.from_url(url, encoding="utf-8", decode_responses=True)
+    return _redis_client
