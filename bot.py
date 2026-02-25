@@ -519,19 +519,29 @@ async def monitor():
     await asyncio.sleep(10)
 
     while True:
-        cursor.execute("SELECT user_id, mode, rooms, district FROM users WHERE active=1")
-        users = cursor.fetchall()
+        try:
+            cursor.execute(
+                "SELECT user_id, mode, rooms, district FROM users WHERE active=1"
+            )
+            users = cursor.fetchall()
 
-        for user_id, mode, rooms, district in users:
-            if not district:
-                continue
+            for user_id, mode, rooms, district in users:
+                if not district:
+                    continue
 
-            access, _ = has_access(user_id)
-            if not access:
-                continue
+                access, _ = has_access(user_id)
+                if not access:
+                    continue
 
-            url = build_url(mode, rooms, district)
-            await send_results(user_id, url)
+                url = build_url(mode, rooms, district)
+
+                try:
+                    await send_results(user_id, url)
+                except Exception as e:
+                    print(f"Send error for {user_id}:", e)
+
+        except Exception as e:
+            print("Monitor loop error:", e)
 
         await asyncio.sleep(120)
 
