@@ -115,7 +115,17 @@ async def _tier_loop(
 
                     for d in districts:
                         slug = DISTRICT_MAP.get(d, d.lower().replace(" ", ""))
-                        listings = await parser.parse(mode, rooms, slug, from_owner)
+                        try:
+                            listings = await asyncio.wait_for(
+                                parser.parse(mode, rooms, slug, from_owner), timeout=20
+                            )
+                        except asyncio.TimeoutError:
+                            logger.warning(
+                                "Parser timeout for user %s, tier %s, district %s",
+                                user.get("user_id"), tier, d,
+                            )
+                            # skip this district and continue with next one
+                            continue
                         await _process_user(user, listings, pool, queue, config)
                 except Exception as e:
                     logger.exception("Monitor user %s: %s", user.get("user_id"), e)
