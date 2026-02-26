@@ -42,8 +42,6 @@ async def init_db() -> None:
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
 
-            ALTER TABLE users
-            ADD COLUMN IF NOT EXISTS subscription_type TEXT DEFAULT 'free';
 
             CREATE TABLE IF NOT EXISTS sent_listings (
                 id SERIAL PRIMARY KEY,
