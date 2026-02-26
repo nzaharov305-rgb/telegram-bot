@@ -4,7 +4,6 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties
 
 from app.config import Config
 from app.database.connection import init_db, close_db
@@ -16,7 +15,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,47 +23,35 @@ async def main() -> None:
 
     bot = Bot(
         token=config.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        parse_mode=ParseMode.HTML,
     )
 
     dp = Dispatcher()
 
-    # Middleware
-    dp.update.middleware(DatabaseMiddleware(config))
-    dp.update.middleware(SubscriptionMiddleware())
-
-    # Routers
-    dp.include_router(setup_routers())
-
-    # Init database (один раз!)
+    # init database
     await init_db(config.DATABASE_URL)
     logger.info("Database initialized")
 
-    # Background monitor
-    monitor_task = asyncio.create_task(run_monitor(bot, config))
-    logger.info("Monitor started")
+    # middleware
+    dp.update.middleware(DatabaseMiddleware(config.DATABASE_URL))
+    dp.update.middleware(SubscriptionMiddleware())
 
-    # Clean webhook (если вдруг был)
+    # routers
+    dp.include_router(setup_routers())
+
+    # monitor task
+    asyncio.create_task(run_monitor(bot, config))
+
     await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Bot started")
 
-    try:
-        logger.info("Bot started")
-        await dp.start_polling(bot)
-    finally:
-        # Останавливаем монитор и корректно закрываем БД/бота
-        monitor_task.cancel()
-        try:
-            await monitor_task
-        except asyncio.CancelledError:
-            pass
-
-        await close_db()
-        await bot.session.close()
-        logger.info("Shutdown complete")
+    await dp.start_polling(bot)
 
 
-if __name__ == "__main__":
+if name == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Bot stopped")
+    finally:
+        asyncio.run(close_db())
