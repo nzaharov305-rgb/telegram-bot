@@ -1,4 +1,4 @@
-"""Монитор парсинга с разделением по тарифам."""
+"""Монитор парсинга с error isolation и production оптимизациями."""
 import asyncio
 import logging
 from datetime import datetime
@@ -111,7 +111,7 @@ async def run_monitor(bot, config: Config) -> None:
     from app.database.repositories import StatsRepository
 
     queue = SendQueue(bot, config.RATE_LIMIT_PER_SECOND)
-    pool = await get_pool()
+    pool = await get_pool(config.DATABASE_URL)
     stats_repo = StatsRepository(pool)
     user_repo = UserRepository(pool, config)
     sent_repo = SentListingsRepository(pool)

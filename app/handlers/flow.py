@@ -65,7 +65,7 @@ async def district_select(
     from app.database.connection import get_pool
     from app.database.repositories import SentListingsRepository
 
-    pool = await get_pool()
+    pool = await get_pool(config.DATABASE_URL)
     sent_repo = SentListingsRepository(pool)
 
     for i, ls in enumerate(listings[:10]):

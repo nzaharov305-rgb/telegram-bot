@@ -72,7 +72,7 @@ async def subscription_request(
     import os
     from app.database.connection import get_pool
 
-    pool = await get_pool()
+    pool = await get_pool(config.DATABASE_URL)
     row = await pool.fetchrow(
         """
         INSERT INTO payment_requests (user_id, amount, plan)
@@ -108,7 +108,7 @@ async def pay_request_sent(
     from app.database.connection import get_pool
     from aiogram import Bot
 
-    pool = await get_pool()
+    pool = await get_pool(config.DATABASE_URL)
     row = await pool.fetchrow(
         "SELECT user_id, amount, plan FROM payment_requests WHERE id = $1 AND status = 'pending'",
         req_id,
@@ -155,7 +155,7 @@ async def pay_confirm(
     from datetime import datetime, timedelta
     from app.database.connection import get_pool
 
-    pool = await get_pool()
+    pool = await get_pool(config.DATABASE_URL)
     row = await pool.fetchrow(
         "SELECT user_id, plan FROM payment_requests WHERE id = $1 AND status = 'pending'",
         req_id,
@@ -201,7 +201,7 @@ async def pay_reject(
     req_id = int(callback.data.split(":")[2])
     from app.database.connection import get_pool
 
-    pool = await get_pool()
+    pool = await get_pool(config.DATABASE_URL)
     row = await pool.fetchrow(
         "SELECT user_id FROM payment_requests WHERE id = $1 AND status = 'pending'",
         req_id,

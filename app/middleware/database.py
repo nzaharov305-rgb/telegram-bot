@@ -23,7 +23,7 @@ class DatabaseMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        pool = await get_pool()
+        pool = await get_pool(self.config.DATABASE_URL)
         data["pool"] = pool
         data["user_repo"] = UserRepository(pool, self.config)
         data["sent_repo"] = SentListingsRepository(pool)
