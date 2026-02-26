@@ -1,29 +1,33 @@
 """PostgreSQL через asyncpg."""
 import asyncpg
-from typing import AsyncGenerator
-
+from typing import Optional
 from app.config import Config
 
-_pool: asyncpg.Pool | None = None
+_pool: Optional[asyncpg.Pool] = None
 
 
 async def get_pool() -> asyncpg.Pool:
     global _pool
+
     if _pool is None:
         cfg = Config.from_env()
+
         _pool = await asyncpg.create_pool(
-            cfg.DATABASE_URL,
-            min_size=5,
-            max_size=20,
+            dsn=cfg.DATABASE_URL,
+            min_size=1,          # ВАЖНО для Railway
+            max_size=5,          # не 20
             command_timeout=60,
         )
+
     return _pool
 
 
 async def init_db() -> None:
     pool = await get_pool()
+
     async with pool.acquire() as conn:
-        await conn.execute("""
+        await conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT UNIQUE NOT NULL,
@@ -42,7 +46,6 @@ async def init_db() -> None:
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
 
-
             CREATE TABLE IF NOT EXISTS sent_listings (
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT NOT NULL,
@@ -52,6 +55,12 @@ async def init_db() -> None:
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_listings_unique
                 ON sent_listings(user_id, listing_id);
+
+            CREATE INDEX IF NOT EXISTS idx_sent_listings_user
+                ON sent_listings(user_id);
+
+            CREATE INDEX IF NOT EXISTS idx_sent_listings_listing
+                ON sent_listings(listing_id);
 
             CREATE TABLE IF NOT EXISTS payment_requests (
                 id SERIAL PRIMARY KEY,
@@ -71,17 +80,19 @@ async def init_db() -> None:
                 messages_sent INTEGER DEFAULT 0
             );
 
-            CREATE INDEX IF NOT EXISTS idx_sent_listings_user ON sent_listings(user_id);
-            CREATE INDEX IF NOT EXISTS idx_sent_listings_listing ON sent_listings(listing_id);
-            CREATE INDEX IF NOT EXISTS idx_users_subscription ON users(subscription_type);
-            CREATE INDEX IF NOT EXISTS idx_users_active 
-                ON users(notifications_enabled) 
+            CREATE INDEX IF NOT EXISTS idx_users_subscription
+                ON users(subscription_type);
+
+            CREATE INDEX IF NOT EXISTS idx_users_active
+                ON users(notifications_enabled)
                 WHERE notifications_enabled = TRUE;
-        """)
+            """
+        )
 
 
 async def close_db() -> None:
     global _pool
+
     if _pool:
         await _pool.close()
         _pool = None
