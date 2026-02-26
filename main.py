@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 async def main() -> None:
     config = Config.from_env()
-    bot = Bot(token=config.TOKEN, parse_mode=ParseMode.HTML)
+    bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
     dp = Dispatcher()
 
     # attach common middleware
