@@ -29,7 +29,7 @@ async def main() -> None:
     logger.info("Database initialized")
 
     # middleware
-    dp.update.middleware(DatabaseMiddleware(config.DATABASE_URL))
+    dp.update.middleware(DatabaseMiddleware(config))
     dp.update.middleware(SubscriptionMiddleware())
 
     # routers
