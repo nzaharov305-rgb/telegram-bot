@@ -1,30 +1,35 @@
 """PostgreSQL через asyncpg (Railway)."""
+
 import asyncpg
 from typing import Optional
+from app.config import Config
 
 _pool: Optional[asyncpg.Pool] = None
 
 
-async def get_pool(dsn: str) -> asyncpg.Pool:
-    """Ленивая инициализация пула по DSN."""
+async def get_pool() -> asyncpg.Pool:
+    """Ленивая инициализация пула через DATABASE_URL из env."""
     global _pool
 
     if _pool is None:
+        config = Config.from_env()
+
         _pool = await asyncpg.create_pool(
-            dsn=dsn,
-            min_size=1,          # ВАЖНО для Railway
+            dsn=config.DATABASE_URL,
+            min_size=1,   # важно для Railway
             max_size=5,
             command_timeout=60,
         )
+
     return _pool
 
 
-async def init_db(dsn: str) -> None:
-    """Создаёт таблицы + ДОБАВЛЯЕТ недостающие колонки в старой БД."""
-    pool = await get_pool(dsn)
+async def init_db() -> None:
+    """Создаёт таблицы + добавляет недостающие колонки."""
+    pool = await get_pool()
 
     async with pool.acquire() as conn:
-        # 1) Базовые таблицы (минимум, чтобы существовали)
+        # 1) Базовые таблицы
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -64,7 +69,7 @@ async def init_db(dsn: str) -> None:
             """
         )
 
-        # 2) Миграции users: добавляем всё, чего может не быть в старой таблице
+        # 2) Миграции users
         await conn.execute(
             """
             ALTER TABLE users
@@ -79,7 +84,7 @@ async def init_db(dsn: str) -> None:
             """
         )
 
-        # 3) Индексы (после миграций!)
+        # 3) Индексы
         await conn.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_listings_unique
