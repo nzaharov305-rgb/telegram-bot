@@ -42,12 +42,16 @@ async def init_db() -> None:
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
 
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS subscription_type TEXT DEFAULT 'free';
+
             CREATE TABLE IF NOT EXISTS sent_listings (
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT NOT NULL,
                 listing_id TEXT NOT NULL,
                 sent_at TIMESTAMPTZ DEFAULT NOW()
             );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_listings_unique
                 ON sent_listings(user_id, listing_id);
 
@@ -72,7 +76,9 @@ async def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_sent_listings_user ON sent_listings(user_id);
             CREATE INDEX IF NOT EXISTS idx_sent_listings_listing ON sent_listings(listing_id);
             CREATE INDEX IF NOT EXISTS idx_users_subscription ON users(subscription_type);
-            CREATE INDEX IF NOT EXISTS idx_users_active ON users(notifications_enabled) WHERE notifications_enabled = TRUE;
+            CREATE INDEX IF NOT EXISTS idx_users_active 
+                ON users(notifications_enabled) 
+                WHERE notifications_enabled = TRUE;
         """)
 
 
