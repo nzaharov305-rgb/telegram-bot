@@ -7,7 +7,7 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class Config:
-    BOT_TOKEN: str
+    TOKEN: str
     DATABASE_URL: str
     ADMIN_IDS: tuple[int, ...]
 
@@ -17,6 +17,7 @@ class Config:
     FREE_MAX_LISTINGS_PER_DAY: int
 
     PRO_CHECK_INTERVAL: int = 30
+    STANDARD_CHECK_INTERVAL: int = 30
 
     PARSER_DELAY_MAX: float = 4.5
     PARSER_TIMEOUT: int = 15
@@ -47,7 +48,7 @@ class Config:
         )
 
         return cls(
-            BOT_TOKEN=bot_token,
+            TOKEN=bot_token,
             DATABASE_URL=database_url,
             ADMIN_IDS=admin_ids or (0,),
             PRICE_STANDARD=int(os.getenv("PRICE_STANDARD", "4900")),
@@ -57,5 +58,6 @@ class Config:
                 os.getenv("FREE_MAX_LISTINGS_PER_DAY", "5")
             ),
             PRO_CHECK_INTERVAL=int(os.getenv("PRO_CHECK_INTERVAL", "30")),
+            STANDARD_CHECK_INTERVAL=int(os.getenv("STANDARD_CHECK_INTERVAL", "30")),
             PROXY_LIST=proxy_list,
         )
