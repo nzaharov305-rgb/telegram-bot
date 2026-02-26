@@ -9,9 +9,11 @@ from .admin import router as admin_router
 
 def setup_routers() -> Router:
     root = Router()
-   root.include_router(start_router)
-root.include_router(flow_router)
-root.include_router(subscription_router)
-root.include_router(stats_router)
-root.include_router(admin_router)
+
+    root.include_router(start_router)
+    root.include_router(flow_router)
+    root.include_router(subscription_router)
+    root.include_router(stats_router)
+    root.include_router(admin_router)
+
     return root
