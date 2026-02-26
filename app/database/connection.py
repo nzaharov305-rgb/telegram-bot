@@ -12,6 +12,7 @@ _pool: asyncpg.Pool | None = None
 
 async def get_pool(dsn: str) -> asyncpg.Pool:
     global _pool
+
     if _pool is None:
         logger.info("Database: attempting to create connection pool")
         _pool = await asyncpg.create_pool(
@@ -93,6 +94,6 @@ async def init_db() -> None:
 
 async def close_db() -> None:
     global _pool
-    if _pool:
+    if _pool is not None:
         await _pool.close()
         _pool = None

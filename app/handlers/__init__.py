@@ -1,5 +1,4 @@
 from aiogram import Router
-
 from .start import router as start_router
 from .flow import router as flow_router
 from .subscription import router as subscription_router

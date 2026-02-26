@@ -24,21 +24,23 @@ async def main() -> None:
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
 
-    # attach common middleware
-    dp.update.middleware(DatabaseMiddleware(config))
-    dp.update.middleware(SubscriptionMiddleware())
-
-    # include all application routers
-    dp.include_router(setup_routers())
-
-    await init_db()
+    # init database
+    await init_db(config.DATABASE_URL)
     logger.info("Database initialized")
 
+    # middleware
+    dp.update.middleware(DatabaseMiddleware(config.DATABASE_URL))
+    dp.update.middleware(SubscriptionMiddleware())
+
+    # routers
+    dp.include_router(setup_routers())
+
+    # monitor task
     asyncio.create_task(run_monitor(bot, config))
-    logger.info("Monitor started")
 
     await bot.delete_webhook(drop_pending_updates=True)
     logger.info("Bot started")
+
     await dp.start_polling(bot)
 
 
@@ -48,4 +50,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Bot stopped")
     finally:
-        asyncio.run(close_db()) 
+        asyncio.run(close_db())
