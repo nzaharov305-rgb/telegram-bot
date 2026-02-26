@@ -16,8 +16,9 @@ class Config:
     TRIAL_HOURS: int
     FREE_MAX_LISTINGS_PER_DAY: int
 
-    PRO_CHECK_INTERVAL: int = 30
+    FREE_CHECK_INTERVAL: int = 30
     STANDARD_CHECK_INTERVAL: int = 30
+    PRO_CHECK_INTERVAL: int = 30
 
     PARSER_DELAY_MAX: float = 4.5
     PARSER_TIMEOUT: int = 15
@@ -57,7 +58,8 @@ class Config:
             FREE_MAX_LISTINGS_PER_DAY=int(
                 os.getenv("FREE_MAX_LISTINGS_PER_DAY", "5")
             ),
-            PRO_CHECK_INTERVAL=int(os.getenv("PRO_CHECK_INTERVAL", "30")),
+            FREE_CHECK_INTERVAL=int(os.getenv("FREE_CHECK_INTERVAL", "30")),
             STANDARD_CHECK_INTERVAL=int(os.getenv("STANDARD_CHECK_INTERVAL", "30")),
+            PRO_CHECK_INTERVAL=int(os.getenv("PRO_CHECK_INTERVAL", "30")),
             PROXY_LIST=proxy_list,
         )
