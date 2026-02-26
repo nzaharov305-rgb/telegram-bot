@@ -22,6 +22,7 @@ class Config:
 
     PARSER_DELAY_MAX: float = 4.5
     PARSER_TIMEOUT: int = 15
+    PARSER_RETRY_COUNT: int = 3
 
     RATE_LIMIT_PER_SECOND: float = 1.0
     PROXY_LIST: tuple[str, ...] = ()
@@ -61,5 +62,6 @@ class Config:
             FREE_CHECK_INTERVAL=int(os.getenv("FREE_CHECK_INTERVAL", "30")),
             STANDARD_CHECK_INTERVAL=int(os.getenv("STANDARD_CHECK_INTERVAL", "30")),
             PRO_CHECK_INTERVAL=int(os.getenv("PRO_CHECK_INTERVAL", "30")),
+            PARSER_RETRY_COUNT=int(os.getenv("PARSER_RETRY_COUNT", "3")),
             PROXY_LIST=proxy_list,
         )
