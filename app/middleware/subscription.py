@@ -35,16 +35,22 @@ class SubscriptionMiddleware(BaseMiddleware):
 
         # database middleware should have injected user_repo
         user_repo: UserRepository | None = data.get("user_repo")
-        if user_repo is None or not event.from_user:
+        
+        # Get user from data (aiogram extracts it automatically)
+        from_user = data.get("event_from_user")
+        if user_repo is None or from_user is None:
             return await handler(event, data)
 
-        user = await user_repo.get(event.from_user.id)
+        user = await user_repo.get(from_user.id)
         if not user or not user_repo.is_subscription_active(user):
             msg = "Нет активной подписки. Перейдите в раздел 💎 Подписка."
             if isinstance(event, Message):
                 await event.answer(msg)
-            else:
-                await event.message.answer(msg)
-            raise CancelHandler()
+                raise CancelHandler()
+            elif isinstance(event, CallbackQuery):
+                await event.answer(msg, show_alert=True)
+                raise CancelHandler()
+            # For other event types, allow processing
+            return await handler(event, data)
 
         return await handler(event, data)

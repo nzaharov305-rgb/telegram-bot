@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ## Конфигурация (.env)
 
 ```
-BOT_TOKEN=...
+TOKEN=...
 DATABASE_URL=postgresql://user:pass@host:5432/db
 ADMIN_IDS=123456789
 PAYMENT_CARD=0000 0000 0000 0000
@@ -46,7 +46,7 @@ python main.py
 
 1. Добавьте PostgreSQL (Railway → New → Database)
 2. Подключите репозиторий
-3. Укажите переменные: BOT_TOKEN, DATABASE_URL, ADMIN_IDS
+3. Укажите переменные: TOKEN, DATABASE_URL, ADMIN_IDS
 4. Deploy
 
 ## Структура

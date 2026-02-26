@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 async def main() -> None:
     config = Config.from_env()
+    logger.info("Config: %s", config.masked_summary())
+    logger.info("Config fingerprint: %s", config.fingerprint())
     bot = Bot(token=config.TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
 
