@@ -24,12 +24,13 @@ async def get_pool() -> asyncpg.Pool:
     return _pool
 
 
-async def init_db() -> None:
-    """Создаёт таблицы + добавляет недостающие колонки."""
-    pool = await get_pool()
-
+async def init_db(dsn: str | None = None) -> None:
+    """
+    Можно вызывать и init_db(), и init_db(DATABASE_URL).
+    Так мы убираем TypeError и всё работает на Railway.
+    """
+    pool = await get_pool(dsn)
     async with pool.acquire() as conn:
-        # 1) Базовые таблицы
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -41,6 +42,16 @@ async def init_db() -> None:
                 district TEXT,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
+
+            ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS districts TEXT[],
+                ADD COLUMN IF NOT EXISTS subscription_type TEXT DEFAULT 'free',
+                ADD COLUMN IF NOT EXISTS subscription_until TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS trial_until TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS accepted_terms BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS from_owner BOOLEAN DEFAULT FALSE;
 
             CREATE TABLE IF NOT EXISTS sent_listings (
                 id SERIAL PRIMARY KEY,
@@ -66,6 +77,22 @@ async def init_db() -> None:
                 active_users INTEGER DEFAULT 0,
                 messages_sent INTEGER DEFAULT 0
             );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_listings_unique
+                ON sent_listings(user_id, listing_id);
+
+            CREATE INDEX IF NOT EXISTS idx_sent_listings_user
+                ON sent_listings(user_id);
+
+            CREATE INDEX IF NOT EXISTS idx_sent_listings_listing
+                ON sent_listings(listing_id);
+
+            CREATE INDEX IF NOT EXISTS idx_users_subscription
+                ON users(subscription_type);
+
+            CREATE INDEX IF NOT EXISTS idx_users_active
+                ON users(notifications_enabled)
+                WHERE notifications_enabled = TRUE;
             """
         )
 
