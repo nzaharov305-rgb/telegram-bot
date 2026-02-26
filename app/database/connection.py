@@ -1,31 +1,30 @@
-"""PostgreSQL через asyncpg."""
+"""PostgreSQL через asyncpg (Railway)."""
 import asyncpg
 from typing import Optional
-from app.config import Config
 
 _pool: Optional[asyncpg.Pool] = None
 
 
-async def get_pool() -> asyncpg.Pool:
+async def get_pool(dsn: str) -> asyncpg.Pool:
+    """Ленивая инициализация пула по DSN."""
     global _pool
 
     if _pool is None:
-        cfg = Config.from_env()
-
         _pool = await asyncpg.create_pool(
-            dsn=cfg.DATABASE_URL,
+            dsn=dsn,
             min_size=1,          # ВАЖНО для Railway
-            max_size=5,          # не 20
+            max_size=5,
             command_timeout=60,
         )
-
     return _pool
 
 
-async def init_db() -> None:
-    pool = await get_pool()
+async def init_db(dsn: str) -> None:
+    """Создаёт таблицы + ДОБАВЛЯЕТ недостающие колонки в старой БД."""
+    pool = await get_pool(dsn)
 
     async with pool.acquire() as conn:
+        # 1) Базовые таблицы (минимум, чтобы существовали)
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -35,14 +34,6 @@ async def init_db() -> None:
                 mode TEXT DEFAULT 'rent',
                 rooms INTEGER DEFAULT 1,
                 district TEXT,
-                districts TEXT[],
-                subscription_type TEXT DEFAULT 'free',
-                subscription_until TIMESTAMPTZ,
-                trial_used BOOLEAN DEFAULT FALSE,
-                trial_until TIMESTAMPTZ,
-                accepted_terms BOOLEAN DEFAULT FALSE,
-                notifications_enabled BOOLEAN DEFAULT TRUE,
-                from_owner BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
 
@@ -52,15 +43,6 @@ async def init_db() -> None:
                 listing_id TEXT NOT NULL,
                 sent_at TIMESTAMPTZ DEFAULT NOW()
             );
-
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_listings_unique
-                ON sent_listings(user_id, listing_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sent_listings_user
-                ON sent_listings(user_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sent_listings_listing
-                ON sent_listings(listing_id);
 
             CREATE TABLE IF NOT EXISTS payment_requests (
                 id SERIAL PRIMARY KEY,
@@ -79,6 +61,35 @@ async def init_db() -> None:
                 active_users INTEGER DEFAULT 0,
                 messages_sent INTEGER DEFAULT 0
             );
+            """
+        )
+
+        # 2) Миграции users: добавляем всё, чего может не быть в старой таблице
+        await conn.execute(
+            """
+            ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS districts TEXT[],
+                ADD COLUMN IF NOT EXISTS subscription_type TEXT DEFAULT 'free',
+                ADD COLUMN IF NOT EXISTS subscription_until TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS trial_until TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS accepted_terms BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS from_owner BOOLEAN DEFAULT FALSE;
+            """
+        )
+
+        # 3) Индексы (после миграций!)
+        await conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_listings_unique
+                ON sent_listings(user_id, listing_id);
+
+            CREATE INDEX IF NOT EXISTS idx_sent_listings_user
+                ON sent_listings(user_id);
+
+            CREATE INDEX IF NOT EXISTS idx_sent_listings_listing
+                ON sent_listings(listing_id);
 
             CREATE INDEX IF NOT EXISTS idx_users_subscription
                 ON users(subscription_type);
@@ -92,7 +103,6 @@ async def init_db() -> None:
 
 async def close_db() -> None:
     global _pool
-
-    if _pool:
+    if _pool is not None:
         await _pool.close()
         _pool = None
