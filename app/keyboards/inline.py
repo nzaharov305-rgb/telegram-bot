@@ -11,6 +11,9 @@ def main_menu_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🏡 Продажа", callback_data="menu:sale"),
     )
     builder.row(
+        InlineKeyboardButton(text="🏢 ЖК (Комплексы)", callback_data="menu:rc"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🔔 Уведомления", callback_data="menu:notifications"),
     )
     builder.row(

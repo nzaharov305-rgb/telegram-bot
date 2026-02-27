@@ -4,6 +4,7 @@ from .flow import router as flow_router
 from .subscription import router as subscription_router
 from .stats import router as stats_router
 from .admin import router as admin_router
+from .rc import router as rc_router
 
 
 def setup_routers() -> Router:
@@ -13,4 +14,5 @@ def setup_routers() -> Router:
     root.include_router(subscription_router)
     root.include_router(stats_router)
     root.include_router(admin_router)
+    root.include_router(rc_router)
     return root

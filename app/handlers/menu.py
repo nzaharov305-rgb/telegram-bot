@@ -5,6 +5,7 @@ from datetime import datetime
 
 from app.database.repositories import UserRepository
 from app.keyboards import rent_sale_kb, notifications_kb, subscription_kb
+from app.keyboards.rc_keyboards import rc_category_kb
 
 router = Router()
 
@@ -104,3 +105,13 @@ async def menu_subscription(
         text,
         reply_markup=subscription_kb(has_active=has_active, is_trial=is_trial),
     )
+
+
+@router.callback_query(F.data == "menu:rc")
+async def menu_rc(callback: CallbackQuery):
+    """Show residential complex categories."""
+    await callback.message.edit_text(
+        "🏢 Жилые комплексы\n\nВыберите категорию:",
+        reply_markup=rc_category_kb(),
+    )
+    await callback.answer()

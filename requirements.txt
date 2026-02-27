@@ -6,3 +6,4 @@ lxml
 python-dotenv
 redis>=4.6.0
 openai
+psutil
